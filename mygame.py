@@ -1,45 +1,49 @@
-#V2
 #Imports
-import pygame
-import os
-import math
-import numpy
+import pygame, os, math, numpy
 from pygame.locals import *
 from pygame.compat import geterror
 
 clock = pygame.time.Clock() #Used to set ticks
 pctgrass = numpy.random.randint(20,80)/100
-print(pctgrass)
         
-#Convenient stuff for importing images and sounds
-main_dir = os.path.split(os.path.abspath(__file__))[0]
-data_dir = os.path.join(main_dir, 'data')
+#Image loading function
+def loadimage(imgfile,x,y):
+    data_dir = os.path.join(os.path.split(os.path.abspath(__file__))[0], 'data')
+    img = pygame.image.load(os.path.join(data_dir,imgfile))
+    img = img.convert()
+    return img, img.get_rect(topleft = (x,y))
 
 #Block parent class
 class block(pygame.sprite.Sprite):
     def __init__(self):
         pass
+    def dig(self):
+        if not isinstance(self, bedrock):
+            self.kill()
     
-#Bedrock class
+#Dirt class
 class dirt(block):
     def __init__(self,x,y):
         pygame.sprite.Sprite.__init__(self)
         self.grass = numpy.random.choice([True,False], p = [pctgrass, 1-pctgrass])
         if self.grass:
-            self.image = pygame.image.load(os.path.join(data_dir,'grass.jpg'))
+            imgfile = 'grass.jpg'
         else:
-            self.image = pygame.image.load(os.path.join(data_dir,'dirt.jpg'))
-        self.rect = self.image.get_rect(topleft = (x,y))
-    def dig(self):
-        self.kill()
+            imgfile = 'dirt.jpg'
+        self.image, self.rect = loadimage(imgfile,x,y)
 
-#Dirt class
+#Bedrock class
 class bedrock(block):
     def __init__(self,x,y):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.image.load(os.path.join(data_dir,'bedrock.png'))
-        self.rect = self.image.get_rect(topleft = (x,y))
-        
+        self.image, self.rect = loadimage('bedrock.png',x,y)
+
+#Sand class
+class sand(block):
+    def __init__(self,x,y):
+        pygame.sprite.Sprite.__init__(self)
+        self.image, self.rect = loadimage('sand.jpg',x,y)
+
 #Inventory class
 class inventory(pygame.sprite.Sprite):
     def __init__(self):
@@ -55,8 +59,8 @@ class inventory(pygame.sprite.Sprite):
 class Fist(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.image.load(os.path.join(data_dir,'fist.bmp'))
-        self.rect = self.image.get_rect()
+        x,y = pygame.mouse.get_pos()
+        self.image, self.rect = loadimage('fist.bmp',x,y)
     def update(self):
         pos = pygame.mouse.get_pos()
         self.rect.midtop = pos
@@ -83,20 +87,24 @@ def main():
     xdim = math.ceil(screenx/res)
     ydim = math.ceil(screeny/res)
     bdrk = [None]*xdim*ydim
-    drt = [None]*xdim*ydim
+    top = [None]*xdim*ydim
+    topmap = [[None]*xdim]*ydim
     count = 0
     x = 0
     y = 0
     for i in range(ydim):
         for j in range(xdim):
             bdrk[count] = bedrock(x,y)
-            drt[count] = dirt(x,y)
+            
+            top[count] = sand(x,y)
             count += 1
             x += res
         y += res
         x -= res*xdim
-    allsprites = pygame.sprite.RenderPlain((bdrk,drt,fist))
-    allsprites.draw(screen)
+    blockgrp = pygame.sprite.RenderPlain(bdrk,top)
+    fstgrp = pygame.sprite.RenderPlain(fist)
+    blockgrp.draw(screen)
+    fstgrp.draw(screen)
     pygame.display.flip()
     
     #Main loop
@@ -109,13 +117,14 @@ def main():
             elif event.type == KEYDOWN and event.key == K_ESCAPE:
                 going = False
             elif event.type == MOUSEBUTTONDOWN:
-                blockhitlist = pygame.sprite.spritecollide(fist, allsprites, False)
-                for k in range(len(blockhitlist)):
-                    if isinstance(blockhitlist[k], dirt):
-                        blockhitlist[k].dig()
-        allsprites.update()
+                blockhitlist = pygame.sprite.spritecollide(fist, blockgrp, False)
+                for k in blockhitlist:
+                    k.dig()
+        blockgrp.update()
+        fstgrp.update()
         screen.blit(background, (0, 0))
-        allsprites.draw(screen)
+        blockgrp.draw(screen)
+        fstgrp.draw(screen)
         pygame.display.flip()
     pygame.quit()
 
